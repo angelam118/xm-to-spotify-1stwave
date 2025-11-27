@@ -49,3 +49,34 @@ Modify `xm_to_spotify.py` to define the target data source. Update the `XML_CHAN
 ```python
 # Constants
 XML_CHANNEL = "1stwave"  # Example: "octone", "lithium", "bpm"
+
+### 5. Scheduling Strategy
+
+The execution frequency is defined in `.github/workflows/main.yml`. The default configuration executes the synchronization job every 15 minutes to minimize data gaps.
+
+```python
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+
+### Architecture & File Structure
+
+* `xm_to_spotify.py` - The core application logic. This script handles the HTTP requests to XMPlaylist, parses the HTML/JSON response, performs the deduplication check against the local database, and executes the Spotify API calls.
+
+* `spotify_state.json` - A persistent state file tracking the active playlist_id and the current volume index. This file is committed back to the repository after every run.
+
+* `seen_tracks.json` - A JSON array containing the hash set of all previously archived Spotify URIs. This serves as the primary mechanism for deduplication.
+
+* `.github/workflows/main.yml` - The CI/CD configuration file defining the execution environment, dependency installation, script execution, and git commit operations for state persistence.
+
+### Operational Constraints
+
+* Repository Visibility: GitHub Actions offers unlimited execution minutes for public repositories. Private repositories are subject to monthly quotas (typically 2,000 minutes for free accounts). Given the frequent schedule (every 15 minutes), a private repository may exceed this quota.
+
+* State Reset Procedure: To purge the archive and restart collection:
+
+1. Manually delete the generated playlists within the Spotify application.
+
+2. Clear the contents of `spotify_state.json` (set to `{}`) and `seen_tracks.json` (set to `[]`) within the repository.
+
+3. The next execution cycle will detect the void state and initialize "Vol 1".

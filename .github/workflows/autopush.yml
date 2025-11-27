@@ -2,33 +2,40 @@ name: xm-to-spotify-1stwave
 
 on:
   schedule:
-    - cron: '0 * * * *'  # runs hourly
-  workflow_dispatch:
+    - cron: '0 */4 * * *' # Runs every 4 hours
+  workflow_dispatch:      # Allows manual run button
+
+permissions:
+  contents: write         # REQUIRED: Allows the bot to write to the repo
 
 jobs:
-  update_playlist:
+  sync:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.9'
 
       - name: Install dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install cloudscraper
-          pip3 install requests
+        run: pip3 install requests cloudscraper
 
-      - name: Run XM to Spotify script
+      - name: Run Sync Script
         env:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
-          SPOTIFY_USER_ID: ${{ secrets.SPOTIFY_USER_ID }}
+          # Note: We no longer need SPOTIFY_PLAYLIST_ID in secrets!
+        run: python3 xm_to_spotify.py
+
+      # --- NEW STEP: Commit the state file back to repo ---
+      - name: Commit and Push State
         run: |
-          python3 xm_to_spotify.py
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          git add spotify_state.json
+          git commit -m "Update playlist state [skip ci]" || echo "No changes to commit"
+          git push

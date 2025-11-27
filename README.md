@@ -1,59 +1,59 @@
 # XM to Spotify Archiver
 
-This repository implements a serverless automation workflow designed to synchronize broadcast history from **XMPlaylist.com** to **Spotify** playlists.
+A serverless bot that scrapes radio history from **XMPlaylist.com** and archives it to **Spotify** automatically.
 
-The solution operates within GitHub Actions, leveraging a scheduled cron job to fetch, parse, and archive track data. It implements robust error handling, WAF evasion techniques, and state management to ensure data integrity and continuous operation without manual intervention.
+It runs entirely on GitHub Actions using a cron schedule. It handles the scraping, bypasses Cloudflare checks, and manages the playlist size so you don't have to touch it.
 
 ## Technical Overview
 
-- **WAF Evasion & Request Handling:** Utilizes `cloudscraper` to negotiate Cloudflare's anti-bot protection mechanisms, ensuring reliable access to the XMPlaylist API endpoints which are otherwise restricted by 403 Forbidden errors.
+- **Bypassing Cloudflare:** Uses `cloudscraper` to handle the anti-bot checks. Regular requests usually get hit with a 403 Forbidden, but this handles the JS challenge automatically.
 
-- **Idempotency & Deduplication:** Implements a strict deduplication logic using a persistent local JSON database (`seen_tracks.json`). This ensures that specific Spotify URIs are archived exactly once, regardless of broadcast frequency or script execution overlap.
+- **No Duplicates:** Keeps a local database (`seen_tracks.json`) of every song ID it has ever verified. It checks this before adding anything to Spotify, so even if the station plays "Bohemian Rhapsody" three times a day, you only get it once.
 
-- **Automated Lifecycle Management:** Monitors the target Spotify playlist size against the API limit (10,000 tracks). Upon approaching this threshold, the system automatically rotates the active playlist, renaming the current iteration to "Vol X" and initializing a new "Vol X+1" container.
+- **Auto-Rotation:** Spotify caps playlists at 10,000 songs. This script watches the count; when it hits the limit (9,900 buffer), it renames the old playlist to "Vol X" and starts a fresh "Vol X+1" automatically.
 
-- **Fault Tolerance:** Includes exception handling for corrupted or missing state files. The system is designed to self-heal by initializing default states rather than terminating execution, ensuring continuity.
+- **Self-Healing:** If the state files (JSON) ever get empty or corrupted, the script detects it and resets to a default state instead of crashing.
 
-- **Infrastructure:** Deployed on GitHub Actions using public runners, providing a zero-cost execution environment for public repositories.
+- **Infrastructure:** Runs on GitHub Actions. If the repo is public, this is completely free.
 
 ## Deployment & Configuration
 
-### 1. Repository Initialization
+### 1. Fork the Repo
 
-Fork this repository to your own GitHub account to establish an independent workflow context.
+Fork this repository to your own account so you can run your own workflows.
 
-### 2. Spotify API Authorization
+### 2. Get Spotify Keys
 
-The application requires valid credentials to authenticate against the Spotify Web API.
+You need a Spotify App to use the API.
 
-1. Navigate to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2. Create a new Application.
-3. Configure a Redirect URI (e.g., `http://example.org/callback`) to facilitate the OAuth flow.
-4. Record the Client ID and Client Secret.
-5. Generate a Refresh Token: Perform a manual OAuth 2.0 authorization code flow to obtain a long-lived Refresh Token. This token authorizes the application to modify playlists on behalf of the user.
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Create an App.
+3. Set the Redirect URI to `http://example.org/callback`.
+4. Copy the **Client ID** and **Client Secret**.
+5. **Get the Refresh Token:** You'll need to run a manual OAuth flow once to get a long-lived Refresh Token. This allows the bot to modify your playlists forever without you logging in again.
 
-### 3. Environment Secrets Configuration
+### 3. Add Secrets
 
-Securely store the credentials within the repository's GitHub Actions secrets vault. Navigate to **Settings > Secrets and variables > Actions** and provision the following keys:
+Go to your repository **Settings > Secrets and variables > Actions** and add these three keys:
 
-| Secret Name              | Description |
-| ------------------------ | ----------- |
-| `SPOTIFY_CLIENT_ID`      | The Client ID provided by the Spotify Dashboard. |
-| `SPOTIFY_CLIENT_SECRET`  | The Client Secret provided by the Spotify Dashboard. |
-| `SPOTIFY_REFRESH_TOKEN`  | The OAuth 2.0 Refresh Token for the target user account. |
+| Secret Name | Description |
+| :--- | :--- |
+| `SPOTIFY_CLIENT_ID` | From your Spotify Dashboard. |
+| `SPOTIFY_CLIENT_SECRET` | From your Spotify Dashboard. |
+| `SPOTIFY_REFRESH_TOKEN` | The long token string you generated. |
 
-### 4. Application Configuration
+### 4. Configure the Station
 
-Modify `xm_to_spotify.py` to define the target data source. Update the `XML_CHANNEL` constant to match the desired station identifier as defined in the XMPlaylist URL schema.
+Open `xm_to_spotify.py` and change the `XM_CHANNEL` variable to match the station you want (check the URL on xmplaylist.com to be sure).
 
 ```
 # Constants
-XML_CHANNEL = "1stwave"  # Example: "octone", "lithium", "bpm"
+XM_CHANNEL = "1stwave"  # Example: "octane", "lithium", "bpm"
 ```
 
-### **5. Scheduling Strategy**
+### **5. Schedule **
 
-The execution frequency is defined in `.github/workflows/main.yml`. The default configuration executes the synchronization job every 15 minutes to minimize data gaps.
+The schedule is in `.github/workflows/main.yml`. By default, it runs every 15 minutes to catch songs before they fall off the recent history list.
 
 ```
 on:
@@ -63,22 +63,22 @@ on:
 
 ### **Architecture & File Structure**
 
-* `xm_to_spotify.py` - The core application logic. This script handles the HTTP requests to XMPlaylist, parses the HTML/JSON response, performs the deduplication check against the local database, and executes the Spotify API calls.
+* `xm_to_spotify.py` - The main script. Handles the scraping, parsing, deduplication logic, and talks to the Spotify API.
 
-* `spotify_state.json` - A persistent state file tracking the active playlist_id and the current volume index. This file is committed back to the repository after every run.
+* `spotify_state.json` - Keeps track of the current Playlist ID and which "Volume" number we are on. The workflow commits this back to the repo after every run.
 
-* `seen_tracks.json` - A JSON array containing the hash set of all previously archived Spotify URIs. This serves as the primary mechanism for deduplication.
+* `seen_tracks.json` - A JSON list of every Spotify URI we've already archived. Used to prevent duplicates.
 
-* `.github/workflows/main.yml` - The CI/CD configuration file defining the execution environment, dependency installation, script execution, and git commit operations for state persistence.
+* `.github/workflows/main.yml` - The GitHub Actions config. Installs Python, runs the script, and saves the JSON files.
 
 ### **Operational Constraints**
 
-- **Repository Visibility:** GitHub Actions offers unlimited execution minutes for public repositories. Private repositories are subject to monthly quotas (typically 2,000 minutes for free accounts). Given the frequent schedule (every 15 minutes), a private repository may exceed this quota.
+- **Keep It Public:** GitHub Actions are free and unlimited for public repos. If you make this private, you have a monthly limit (usually 2,000 minutes). Since this runs every 15 mins, a private repo will hit that limit pretty fast.
 
-- **State Reset Procedure:** To purge the archive and restart collection:
+- **How To Reset:** If you want to nuke everything and start fresh:
 
-   1. Manually delete the generated playlists within the Spotify application.
+   1. Delete the playlists in your Spotify App.
 
    2. Clear the contents of `spotify_state.json` (set to `{}`) and `seen_tracks.json` (set to `[]`) within the repository.
 
-   3. The next execution cycle will detect the void state and initialize "Vol 1".
+   3. The next run will see the empty state and start over at "Vol 1".

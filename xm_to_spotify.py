@@ -1,53 +1,46 @@
 import os
 import requests
+import time
 
-SPOTIFY_USER_ID = os.environ['SPOTIFY_USER_ID']
-SPOTIFY_ACCESS_TOKEN = os.environ['SPOTIFY_ACCESS_TOKEN']
-BASE_URL = "https://api.spotify.com/v1"
+# Read secrets from environment variables
+CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+REFRESH_TOKEN = os.getenv("SPOTIFY_REFRESH_TOKEN")
 
-HEADERS = {
-    "Authorization": f"Bearer {SPOTIFY_ACCESS_TOKEN}",
-    "Content-Type": "application/json"
-}
+# Spotify API constants
+MAX_TRACKS_PER_REQUEST = 100
+MAX_TRACKS_PER_PLAYLIST = 10000
 
-def get_playlist_track_count(playlist_id):
-    url = f"{BASE_URL}/playlists/{playlist_id}/tracks?limit=1"
-    response = requests.get(url, headers=HEADERS)
-    response.raise_for_status()
-    return response.json()['total']
-
-def create_playlist(name, description=""):
-    url = f"{BASE_URL}/users/{SPOTIFY_USER_ID}/playlists"
+def get_access_token():
+    url = "https://accounts.spotify.com/api/token"
     data = {
-        "name": name,
-        "description": description,
-        "public": False
+        "grant_type": "refresh_token",
+        "refresh_token": REFRESH_TOKEN,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET
     }
-    response = requests.post(url, headers=HEADERS, json=data)
+    response = requests.post(url, data=data)
     response.raise_for_status()
-    return response.json()['id']
+    return response.json()["access_token"]
+
+def chunked(iterable, size):
+    """Yield successive chunks of size `size` from iterable"""
+    for i in range(0, len(iterable), size):
+        yield iterable[i:i + size]
 
 def add_tracks_to_playlist(playlist_id, track_uris):
-    BATCH_SIZE = 100  # max per request
-    for i in range(0, len(track_uris), BATCH_SIZE):
-        batch = track_uris[i:i+BATCH_SIZE]
-        url = f"{BASE_URL}/playlists/{playlist_id}/tracks"
-        data = {"uris": batch}
-        response = requests.post(url, headers=HEADERS, json=data)
-        response.raise_for_status()
+    access_token = get_access_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
 
-def distribute_tracks_across_playlists(base_name, track_uris):
-    playlist_index = 1
-    current_playlist_id = create_playlist(f"{base_name} Part {playlist_index}")
+    # Respect Spotify 10k max per playlist
+    if len(track_uris) > MAX_TRACKS_PER_PLAYLIST:
+        track_uris = track_uris[:MAX_TRACKS_PER_PLAYLIST]
+        print(f"Warning: Only adding first {MAX_TRACKS_PER_PLAYLIST} tracks due to Spotify limit.")
 
-    while track_uris:
-        current_count = get_playlist_track_count(current_playlist_id)
-        space_left = 10000 - current_count
-        to_add = track_uris[:space_left]
-        add_tracks_to_playlist(current_playlist_id, to_add)
-        track_uris = track_uris[space_left:]
-
-        if track_uris:  # need new playlist
-            playlist_index += 1
-            current_playlist_id = create_playlist(f"{base_name} Part {playlist_index}")
-
+    for chunk in chunked(track_uris, MAX_TRACKS_PER_REQUEST):
+        url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+        data = {"uris": chunk}
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code not in [200, 201]:
+            print("Error adding tracks:", response.json())
+        time.sleep(0.1)  # small delay to avoid rate limits

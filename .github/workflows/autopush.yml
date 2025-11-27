@@ -1,28 +1,33 @@
 name: xm-to-spotify-1stwave
 on:
   schedule:
-    - cron: '*/5 * * * *'   # every 5 minutes
-  workflow_dispatch: {}
+    - cron: '0 * * * *'  # runs hourly
+  workflow_dispatch:      # allows manual run
 
 jobs:
-  run:
+  update_playlist:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
 
-      - name: Setup Python
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install deps
-        run: pip3 install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          # If you have any dependencies, list them here
+          # e.g., pip install requests
 
-      - name: Run xm->spotify script
+      - name: Run XM to Spotify script
         env:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
           SPOTIFY_USER_ID: ${{ secrets.SPOTIFY_USER_ID }}
-        run: python3 xm_to_spotify.py
+        run: |
+          python3 xm_to_spotify.py

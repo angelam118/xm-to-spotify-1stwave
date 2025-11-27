@@ -46,7 +46,7 @@ Securely store the credentials within the repository's GitHub Actions secrets va
 
 Modify `xm_to_spotify.py` to define the target data source. Update the `XML_CHANNEL` constant to match the desired station identifier as defined in the XMPlaylist URL schema.
 
-`python
+``python
 # Constants
 XML_CHANNEL = "1stwave"  # Example: "octone", "lithium", "bpm"`
 
@@ -75,8 +75,8 @@ on:
 
 - **State Reset Procedure:** To purge the archive and restart collection:
 
-1. Manually delete the generated playlists within the Spotify application.
+- 1. Manually delete the generated playlists within the Spotify application.
 
-2. Clear the contents of `spotify_state.json` (set to `{}`) and `seen_tracks.json` (set to `[]`) within the repository.
+- 2. Clear the contents of `spotify_state.json` (set to `{}`) and `seen_tracks.json` (set to `[]`) within the repository.
 
-3. The next execution cycle will detect the void state and initialize "Vol 1".
+- 3. The next execution cycle will detect the void state and initialize "Vol 1".

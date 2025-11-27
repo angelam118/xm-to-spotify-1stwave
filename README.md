@@ -54,10 +54,11 @@ XML_CHANNEL = "1stwave"  # Example: "octone", "lithium", "bpm"`
 
 The execution frequency is defined in `.github/workflows/main.yml`. The default configuration executes the synchronization job every 15 minutes to minimize data gaps.
 
-`
+```
 on:
   schedule:
-    - cron: '*/15 * * * *'`
+    - cron: '*/15 * * * *'
+```
 
 ### **Architecture & File Structure**
 
@@ -75,8 +76,8 @@ on:
 
 - **State Reset Procedure:** To purge the archive and restart collection:
 
-  1. Manually delete the generated playlists within the Spotify application.
+  ### 1. Manually delete the generated playlists within the Spotify application.
 
-  2. Clear the contents of `spotify_state.json` (set to `{}`) and `seen_tracks.json` (set to `[]`) within the repository.
+  ### 2. Clear the contents of `spotify_state.json` (set to `{}`) and `seen_tracks.json` (set to `[]`) within the repository.
 
-  3. The next execution cycle will detect the void state and initialize "Vol 1".
+  ### 3. The next execution cycle will detect the void state and initialize "Vol 1".

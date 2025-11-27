@@ -11,9 +11,6 @@ REFRESH_TOKEN = os.getenv("SPOTIFY_REFRESH_TOKEN")
 MAX_TRACKS_PER_REQUEST = 100
 MAX_TRACKS_PER_PLAYLIST = 10000
 
-# XMPlaylist API endpoint
-XMPLAYLIST_URL = "http://xmplaylist.com/api/station/1stwave"
-
 def get_access_token():
     url = "https://accounts.spotify.com/api/token"
     data = {
@@ -27,29 +24,15 @@ def get_access_token():
     return response.json()["access_token"]
 
 def chunked(iterable, size):
+    """Yield successive chunks of size `size` from iterable"""
     for i in range(0, len(iterable), size):
         yield iterable[i:i + size]
-
-def fetch_xmplaylist():
-    response = requests.get(XMPLAYLIST_URL)
-    response.raise_for_status()
-    return response.json()["results"]
-
-def extract_spotify_uris(xm_results):
-    uris = []
-    for item in xm_results:
-        for link in item.get("links", []):
-            if link.get("site") == "spotify":
-                url = link.get("url")
-                if url:
-                    track_id = url.split("/")[-1].split("?")[0]
-                    uris.append(f"spotify:track:{track_id}")
-    return uris
 
 def add_tracks_to_playlist(playlist_id, track_uris):
     access_token = get_access_token()
     headers = {"Authorization": f"Bearer {access_token}"}
 
+    # Respect Spotify 10k max per playlist
     if len(track_uris) > MAX_TRACKS_PER_PLAYLIST:
         track_uris = track_uris[:MAX_TRACKS_PER_PLAYLIST]
         print(f"Warning: Only adding first {MAX_TRACKS_PER_PLAYLIST} tracks due to Spotify limit.")
@@ -60,14 +43,35 @@ def add_tracks_to_playlist(playlist_id, track_uris):
         response = requests.post(url, json=data, headers=headers)
         if response.status_code not in [200, 201]:
             print("Error adding tracks:", response.json())
-        time.sleep(0.1)  # avoid rate limits
+        time.sleep(0.1)  # small delay to avoid rate limits
 
+def fetch_xmplaylist():
+    url = "https://xmplaylist.com/api/station/1stwave"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 403:
+        print("Error: Access forbidden. XMPlaylist API might require authentication or block this request.")
+        return None
+    
+    response.raise_for_status()
+    return response.json()["results"]
+
+# Example usage
 if __name__ == "__main__":
-    # Replace this with your Spotify playlist ID
-    PLAYLIST_ID = "your_spotify_playlist_id_here"
-
     xm_results = fetch_xmplaylist()
-    uris = extract_spotify_uris(xm_results)
-    print(f"Adding {len(uris)} tracks to playlist...")
-    add_tracks_to_playlist(PLAYLIST_ID, uris)
-    print("Done!")
+    if not xm_results:
+        print("No tracks fetched from XMPlaylist.")
+    else:
+        # Convert results to Spotify URIs
+        track_uris = []
+        for track in xm_results:
+            for link in track.get("links", []):
+                if link["site"] == "spotify":
+                    track_uris.append(f"spotify:track:{link['url'].split('/')[-1]}")
+                    break
+        # Add to Spotify playlist
+        playlist_id = "YOUR_SPOTIFY_PLAYLIST_ID"
+        add_tracks_to_playlist(playlist_id, track_uris)

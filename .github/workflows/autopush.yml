@@ -30,12 +30,12 @@ jobs:
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
           # Note: We no longer need SPOTIFY_PLAYLIST_ID in secrets!
         run: python3 xm_to_spotify.py
-
-      # --- NEW STEP: Commit the state file back to repo ---
+        
       - name: Commit and Push State
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
-          git add spotify_state.json
-          git commit -m "Update playlist state [skip ci]" || echo "No changes to commit"
+          # Add BOTH files
+          git add spotify_state.json seen_tracks.json
+          git commit -m "Update playlist state and seen tracks [skip ci]" || echo "No changes"
           git push

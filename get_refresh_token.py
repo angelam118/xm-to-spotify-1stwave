@@ -1,14 +1,7 @@
 import requests
 from urllib.parse import urlparse, parse_qs
 import json
-<<<<<<< HEAD
 import os
-=======
-<<<<<<< HEAD
-=======
-import os
->>>>>>> d1f9736 (including file to retrieve refresh token + deleted outdated requirements doc)
->>>>>>> d442eb6 (Better readability in README.md)
 
 # ---------------- CONFIG ----------------
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")

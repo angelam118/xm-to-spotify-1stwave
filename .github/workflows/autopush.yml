@@ -2,8 +2,8 @@ name: xm-to-spotify-1stwave
 
 on:
   schedule:
-    - cron: '0 */4 * * *' # Runs every 4 hours
-  workflow_dispatch:      # Allows manual run button
+    - cron: '*/15 * * * *'  # Runs at :00, :15, :30, :45 of every hour
+  workflow_dispatch:        # Manual run now
 
 permissions:
   contents: write         # REQUIRED: Allows the bot to write to the repo
